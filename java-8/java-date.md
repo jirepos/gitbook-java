@@ -5,7 +5,8 @@
 * DB에서는 SYSDATE와 같은 명령을 사용하지 않는다.
 * **날짜/시간의 표준 문자열 형식은 ISO 8601을 사용한다.** 
 * 서버와 클라이언트는 ISO 8601 형식으로 주고 받는다. 
-
+* java.util.Date, java.util.Calendar는 사용하지 않는다. 
+* java.time 패키지를 사용한다. 
 
 
 **ISO 8601 형식** 
@@ -323,99 +324,160 @@ ZonedDateTime의 format() 메소드에 DateTimeFormatter 객체를 전달하여 
 
 
 
-
 ## 응용하기 
 ### 현재 시간 구하기
+반드시 서버의 타임존 아이디를 가지고 현재 시간을 구한다. 
+```java
+ZonedDateTime systemZonedDateTime = ZonedDateTime.now(ZoneId.of("Asia/Seoul")); // 시스템의 타임존 
+```
 
+## UTC를 java.util.Date로 변환 
+java.util.Date는 시스템의 offset을 사용하기 때문에 UTC 시간대를 Date로 변환하면 시간값이 로컬 시간으로 변경이 된다. DB에 UTC를 넣고 싶은데 java.util.Date를 사용해야 한다면 계산을 해서 넣어 줘야 한다. 
 
+* 사용자가 입력한 시간을 UTC 시간대로 변경한다. 
+* 시스템의 시간대를 구한다. 
+* 시스템의 OffsetDateTime을 구한다. 
+* UTC에서 시스템의 OffsetDateTime의 시간 차이 만큼 초(seconds)를 빼준다. 
+* 이것을 Date로 변환한다. 
 
-
-
-
-## 아래는 정리할 내용 
-
-Calendar.getInstance() 시스템의 현재 날짜와 시간 정보를 얻기 위해 사용한다. java.util.Date를 반환한다.
 
 ```java
-public void testDate() {
-  Date date =  Calendar.getInstance().getTime();
-  System.out.println(date.toString());
-}
+// 사용자의 타임존    Asia/Aden (+03:00)
+// 사용자의 타임존으로 ZonedDateTime 생성 
+ZonedDateTime userZonedDateTime   = ZonedDateTime.now(ZoneId.of(userZoneId)); 
+// 이것을 UTC로 변환 
+ZonedDateTime utcZonedDateTime = userZonedDateTime.withZoneSameInstant(ZoneId.of("UTC"));  
+// 시스템의 타임존 
+ZonedDateTime systemZonedDateTime =  ZonedDateTime.now(ZoneId.of("Asia/Seoul")); 
+// 시스템 타임존의 offset 구함
+OffsetDateTime sysOffset =  systemZonedDateTime.toOffsetDateTime();
+ZoneOffset zoffset = sysOffset.getOffset();
+
+// UTC ZonedDateTime에서 시스템의 offset의 초(seconds)를 빼준다. 
+ZonedDateTime convertedZdt = utcZonedDateTime.minusSeconds(zoffset.getTotalSeconds()); 
+// 이것을 java.util.dDate로 변환
+Date convertedDate = Date.from(convertedZdt.toInstant());
 ```
 
-```
-  Thu Jul 29 11:59:50 KST 2021
-```
-
-Calendar 클래스로 UTC를 다루기에는 부적합하다.
-
-현재 날짜시간값을 UTC값으로 구하고 싶다면 Instant.now()를 사용한다.1970년 1월 1일 UTC의 첫 번째 순간 이후의 현재 시간까지의 나노초를 나타낸 값 입니다.
+## java.util.Date를 ZonedDateTime으로 변경 
+DB에서 가져온 UTC 값을 java.util.Date로 변환하려면 앞에서 설명한 순서의 반대로 하면 된다. 
 
 ```java
-public void testInstant() {
-  Instant today = Instant.now();
-  System.out.println(today.toString());
-  // Converts this instant to the number of milliseconds 
-  // from the epoch of
-  // 1970-01-01T00:00:00Z.
-    System.out.println(today.toEpochMilli());
-}// :
-```
+// 시스템의 타임존 
+ZonedDateTime systemZonedDateTime = ZonedDateTime.now(ZoneId.of("Asia/Seoul")); 
+// 시스템 타임존의 offset 구함
+OffsetDateTime sysOffset = systemZonedDateTime.toOffsetDateTime();
+sysOffset = systemZonedDateTime.toOffsetDateTime();
+ZoneOffset zoffset = sysOffset.getOffset();
+
+
+// DB에서 Date를 가져온다. 
+ Date convertedDate = getDate(); 
+ // 이것을 Instant로 변경 
+ Instant ins = convertedDate.toInstant();
+ // 이것을 ZonedDateTime으로 변경
+ ZonedDateTime backZonedDateTime = ins.atZone(ZoneId.of("UTC"));
+ // 시스템의 offset의 초(seconds)를 더한다. 
+ ZonedDateTime calcUtc = backZonedDateTime.plusSeconds(zoffset.getTotalSeconds()); 
 
 ```
-2021-07-29T03:19:30.234220900Z
-1627528770234
-```
 
-> java.sql.Date는 java.util.Date를 상속 받는다. 그런데 시/분/초에 대한 값이 없다.
-
-그럼, DB에 값을 넣기 위해서는 Java Bean의 필드를 java.util.Date 형식으로 설정해야 한다.
-
+다음은 테스트 케이스 전체 코드이다. 
 ```java
-public class Person {
-  private java.util.Date regDate; 
-}
+package basic.java8.date;
+
+import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Date;
+
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+public class DateTest2 {
+
+  /**
+   * ZonedDateTime을 java.util.Date로 변환. 그러나 UTC 값으로 보관한다. 
+   * 
+   * 테스트할 타임존은 다음과 같다. 
+   * 
+   * Asia/Aden (+03:00)
+   * America/Cuiaba (-03:00)
+   * Etc/GMT+9 (-09:00)
+   * Etc/GMT+8 (-08:00)
+   * Africa/Nairobi (+03:00)
+   * @param userZoneId 사용자의 ZoneId 
+   */
+  @ParameterizedTest
+  @ValueSource(strings = { "Asia/Aden", "America/Cuiaba", "Asia/Seoul"})
+  void testZonedDateTimeToDate(String userZoneId) {
+    getDate(userZoneId);
+  }//
+
+  Date getDate(String userZoneId) {
+
+    ZonedDateTime systemZonedDateTime =  ZonedDateTime.now(ZoneId.of("Asia/Seoul")); // 시스템의 타임존 
+    // 시스템 타임존의 offset 구함
+    OffsetDateTime sysOffset =  systemZonedDateTime.toOffsetDateTime();
+    ZoneOffset zoffset = sysOffset.getOffset();
+
+    System.out.println("============================================ START");
+   
+    ZonedDateTime userZonedDateTime   = ZonedDateTime.now(ZoneId.of(userZoneId)); // 사용자의 타임존    Asia/Aden (+03:00)
+    System.out.println("USER:" + userZonedDateTime.format(DateTimeFormatter.ISO_DATE_TIME));
+    ZonedDateTime utcZonedDateTime = userZonedDateTime.withZoneSameInstant(ZoneId.of("UTC"));  // UTC로 변경 
+    System.out.println(" UTC:" + utcZonedDateTime.format(DateTimeFormatter.ISO_DATE_TIME));
+        
+    // 시스템 타임존의 offset 구함
+    // OffsetDateTime sysOffset = systemZonedDateTime.toOffsetDateTime();
+    // ZoneOffset zoffset = sysOffset.getOffset();
+    // subtract the offset seconds of the system's timezone from the utc timezone 
+    ZonedDateTime convertedZdt = utcZonedDateTime.minusSeconds(zoffset.getTotalSeconds()); // 초를 빼주면 
+    Date convertedDate = Date.from(convertedZdt.toInstant());
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ"); 
+    System.out.println("CONV:" + sdf.format(convertedDate));  // 출력만 시스템 타임존인 +0900일 뿐 이 값은 무시한다. 
+    return convertedDate; 
+  }
+
+
+  
+  /**
+   * UTC 값으로 설정된 Date를 UTC ZonedDateTime으로 변환한다. 
+   */
+  @ParameterizedTest
+  @ValueSource(strings = { "Asia/Aden", "America/Cuiaba", "Asia/Seoul"})
+  void testDateToZonedDateTime(String userZoneId) {
+    
+    Date convertedDate = getDate(userZoneId); 
+    // 시스템의 타임존 
+    ZonedDateTime systemZonedDateTime = ZonedDateTime.now(ZoneId.of("Asia/Seoul")); 
+    // 시스템 타임존의 offset 구함
+    OffsetDateTime sysOffset = systemZonedDateTime.toOffsetDateTime();
+    sysOffset = systemZonedDateTime.toOffsetDateTime();
+    ZoneOffset zoffset = sysOffset.getOffset();
+    
+
+    // 다시 UTC로 변환 
+    Instant ins = convertedDate.toInstant();
+    System.out.println(ins);
+    //ZonedDateTime backZonedDateTime = ins.atZone(systemZonedDateTime.getZone());
+    ZonedDateTime backZonedDateTime = ins.atZone(ZoneId.of("UTC"));
+    System.out.println(backZonedDateTime);
+    ZonedDateTime calcUtc = backZonedDateTime.plusSeconds(zoffset.getTotalSeconds()); // 초를 빼주면 
+    System.out.println(calcUtc);
+
+  }//:
+  
+
+}///~
 ```
 
-그러면, DB에는 System의 TimeZone의 값이 입력이된다. DB에 UTC를 넣을 수는 없는가? Java Bean에서 java.util.Date를 써야 한다면 Instant를 Date로 변환해야 한다. Date.from(Instatn)를 사용하면 된다.
-
-```java
-Instant today = Instant.now();
-// Date로 변환하면 시스템의 값으로 변경됨 
-Date d = Date.from(today);
-```
-
-그런데 문제는 Date 인스턴스의 값을 출력해보면 UTC가 아니라 시스템 타임존의 시간값이 출력된다.
-
-해결방법
-
-Date 시스템의 현재 시간 값을 구하고 Date - offset 그 값에서 UTC와의 시차만큼 값을 뺀다. 그럼 Date값은 UTC가 된다.
-
-그러면 그냥 시스템의 시간값을 그냥 입력하고 보여줄 때 변환한다.
-
-mysql에서 날짜와 시간형식
-
-* date: 날짜 (YYYY-MM-DD)
-* datetime: 날짜와 시간(YYYY-MM-DD hh:mm:ss)
-* timestamp: 날짜와 시간(YYYY-MM-DD hh:mm:ss\[.fraction])
-
-datetime과 timestamp 둘다 날짜와 시간을 적을 수 있는데 가장큰 차이는 타임 존 반영 유무다.
-
-Oracle에서 날짜와 시간 형식 create table time_test (a date, b timestamp(9), c timestamp with time zone, d timestamp with local time zone);
 
 
-```shell
-// 로컬 시간을 의미하는 ISO 8601 문자열
-2021-10-06T15:00:00.000
-// UTC(GMT) 시간을 의미하는 ISO 8601 문자열
-2021-10-06T06:00:00.000Z
-
-// 로컬 시간을 의미하면서 UTC(GMT) 대비 +09:00 임을 의미하는 ISO 8601 문자열
-2021-10-06T15:00:00.000+09:00
-```
-- `2021-10-06T15:00:00.000`은 **ISO 8601**의 기본 형식이다. 해당 시간이 로컬 시간 임을 의미한다.
-- `2021-10-06T06:00:00.000Z`와 같이 뒤에 `Z` 식별자를 추가하면 해당 시간이 **UTC(GMT)** 시간 임을 의미한다.
-- `2021-10-06T15:00:00.000+09:00`와 같이 뒤에 **Z** 대신 `+HH:mm` 식별자를 추가하면 해당 시간이 로컬 시간이면서 **UTC(GMT)**와 **09:00** 만큼 차이가 남을 의미한다. 이 형식의 장점은 인간이 손쉽게 추가적인 계산 없이 로컬 시간을 인지하면서 추가적으로 타임존 정보까지 제공하기 때문에 가장 인간친화적이라고 할 수 있다.
 
 
 
