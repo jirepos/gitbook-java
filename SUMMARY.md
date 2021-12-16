@@ -12,3 +12,4 @@
   * [File Read](java-8/file-read.md)
   * [Charset](java-8/charset.md)
   * [Junit 5 사용하기](java-8/junit.md)
+  * [익명 클래스](java-8/anno-class.md)
