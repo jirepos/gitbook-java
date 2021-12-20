@@ -1,6 +1,6 @@
 # Table of contents
 
-* [시작하기](README.md)
+* [Java 정리](README.md)
 * [Java 8 특징](java-8/README.md)
   * [Enum](java-8/enum.md)
   * [Generic](java-8/generic.md)
