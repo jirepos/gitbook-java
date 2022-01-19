@@ -1,11 +1,19 @@
 # Java 8 Date
 
-표준 날짜/시간에  대한 처리를 위한 기준을 정한다. 
-* DB에는 UTC 값을 저장한다. 
-* DB에서는 SYSDATE와 같은 명령을 사용하지 않는다.
-* 서버와 클라이언트는 ISO 8601 형식으로 주고 받는다. 
-* java.util.Date, java.util.Calendar는 사용하지 않는다. 
-* java.time 패키지를 사용한다. 
+## 용어 
+**GMT(Greenwich Mean Time)**
+GMT는 경도 0도에 위치한 영국 런던 그리니치에 있는 왕립 천문대의 시간으로, 모든 시간대의 시작점을 나타내며, 일년내내 DST의 영향을 받지 않는다. GMT는 1925년 2월 5일부터 사용하기 시작했으며, 1972년 1월 1일까지 세계 표준시로 사용되었다.
+
+**UTC(협정 세계시, 協定世界時)**
+협정 세계시(協定世界時, 영어: Coordinated Universal Time/Universal Time Coordinated, UTC)는 1972년 1월 1일부터 시행된 국제 표준시이다. UTC는 국제원자시와 윤초 보정을 기반으로 표준화되었다
+
+UTC는 그리니치 평균시(GMT)에 기반하므로 GMT로도 불리기도 하는데, UTC와 GMT는 초의 소숫점 단위에서만 차이가 나기 때문에 일상에서는 혼용된다. 기술적인 표기에서는 UTC가 사용된다.
+
+Java 8에서는 타임존을 고려한 날짜와 시간까지도 더 명확하고 편리하게 사용할 수 있다. 타임존은 ZoneId 클래스를 통해 날짜/시간별 DST 이 반영되었는지 확인 할 수도 있다. ZoneId.getAvailableZoneIds() 를 통해 지원하는 지역별 타임존을 확인할 수 있다(현재 시점 등록된 ZoneId는 600개이다).
+
+
+**DST(Daylight Saving time)**
+DST은 자연 일광을 보다 잘 활용하기 위해서 여름철에 표준 시간에서 1시간 앞으로, 그리고 다시 가을에 시간을 1시간 전으로 설정하는 것을 말한다. DST와 "summer time"은 같은 말을 뜻하며 특정 나라에서 주로 불린다. 영국에서 썸머타임이라고 많이 사용하며, DST가 적용되지 않는 표준시는 "winter time"이라고 사용되기도 한다. DST를 독일에서는 "sommerzeit", 스칸디나비아에서는 "sommertid"라고도 사용한다.
 
 
 **ISO 8601 형식** 
@@ -19,6 +27,7 @@
 * T는 날짜와 시간을 구분해주는 delimiter(구분자)이다. 그이외의 의미는 없다.
 * 끝에 Z는 영국 그리니치 천문대 시간을 가르킨다(+00:00). 한국은 (+09:00)이다.
 * Z = Zulu time = GMT = UTC 다 같은말이다.
+
 
 
 
@@ -213,7 +222,7 @@ ZoneId은 타임존, ZoneOffset은 시차를 나타낸다. ZoneOffset는 UTC 기
   }
 ```
 
-그러나 일광 정력타임을 사용하는 도시들이 있기 때문에 시차보다는 ZoneId 를 사용해야 한다. 
+그러나 일광 절약타임을 사용하는 도시들이 있기 때문에 시차보다는 ZoneId 를 사용해야 한다. 
 
 ```java
   @Test 
@@ -320,6 +329,51 @@ ZonedDateTime의 format() 메소드에 DateTimeFormatter 객체를 전달하여 
     System.out.println(zdt2);
   }//:
 ```
+
+
+
+## Epoch 시간 
+1970년 1월 1일 00:00:00 협정 세계시(UTC) 부터의 경과 시간을 초로 환산하여 정수로 나타낸 것이다.
+
+먼저 현재 시간을 구한다. UTC 기준으로 LOcalDateTime을 구한다.
+```java
+Instant now = Instant.now(); // UTC 시간
+LocalDateTime utc = LocalDateTime.ofInstant(now, ZoneId.of("UTC"));
+```
+toEpochSecond() 메서드를 사용하여 Ecpoch 초를 구한다. 타임존에 따라 다른 값을 반환하기 때문에 LocalDateTime이 어느 시간대인지 알야야 한다. 
+```java
+System.out.println(utc.toEpochSecond(ZoneOffset.UTC)); // 시간대가 있어야 epochsecond로 변환이 가능함
+```
+결과
+```shell
+1642632519
+```
+시간대를 Asia/Seoul로 변경하고 Asia/Seoul 시간대의 LocalDateTime을 생성한다. 
+```java
+// LocalDatetTime을 ZonedDateTime으로 변경한다. 
+ZonedDateTime fromZone = ZonedDateTime.of(utc, ZoneID.of("UTC"));
+// 시간대를 변경한다.
+ZonedDateTime toZone = fromZone.withZoneSameInstant(ZoneId.of("Asia/Seoul"));
+LocalDateTime seoul =  toZone.toLocalDateTime();
+```
+이것을 다시 ZonedDateTime으로 변환한다. 
+```java
+ZonedDateTime zoned = seoul.atZone(ZoneId.of("Asia/Seoul"));
+```
+그리고 ZoneOffset을 구한다. 
+```java
+ZoneOffset offset = zoned.getOffset();
+```
+구한 offset을 가지고 Epoch Second를 구할 수 있다. 
+```java
+System.out.println(seoul.toEpochSecond(offset));
+```
+결과
+```shell
+1642632519
+```
+UTC 기준으로 출력한 결과와 같은 결과임을 확인할 수 있다. 
+
 
 
 
@@ -474,7 +528,6 @@ public class DateTest2 {
 
 }///~
 ```
-
 
 
 
