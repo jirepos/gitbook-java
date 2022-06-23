@@ -1,5 +1,6 @@
 # Table of contents
 
+* [설치](install.md)
 * [Enum](enum.md)
 * [Generic](generic.md)
 * [Java Date](java-date.md)
