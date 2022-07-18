@@ -258,7 +258,7 @@ public Interface InterfaceName <T, K> { ... }
 ### \<?\>
 * 모든 타입이 올 수 있다. 
 
-아래는 모든 타입을 헝요한다.
+아래는 모든 타입을 허용한다.
 ```java
  public Stuedent getStudent(Course<?> course) {
    // 
@@ -297,13 +297,18 @@ class MyClass<T supser Student> {
 
 ### 클래스 리터럴
 
-클래스 리터럴은 String.class, Integer.class 등을 말한다. String.class의 타입은 Class\\, Intger.class의 타입은 Class\이다. 클래스 리터럴은 타입 토큰으로서 사용된다.
 
+클래스 리터럴은 String.class, Integer.class 등을 말한다. String.class의 타입은 Class, Intger.class의 타입은 Class이다. 클래스 리터럴은 타입 토큰으로서 사용된다.
+
+*  클래스 리터럴은 타입 토큰으로서 사용된다.
 * **String.class, Integer.class 등을 말한다**
+
+
 
 ### 타입 토큰
 
-타입토큰은 간단히 말해 타입을 나탸내는 토큰이며 클래스 리터럴이 타입 토큰으로서 사용된다. methodA(Class\\\<?> clazz)와 같은 메서드는 타입토큰을 인자로 받는 메서드이다. jackson 라이브러리에는 readValue()라는 메서드를 사용하는데 해당 메서드는 아래와 같이 정의되어 있다. 이렇게 특정 타입의 클래스 정보를 넘겨서 타입 안정성을 가져오는 것을 Type Token이라고 한다.
+타입토큰은 간단히 말해 타입을 나탸내는 토큰이며 클래스 리터럴이 타입 토큰으로서 사용된다. methodA(Class\<?\> clazz)와 같은 메서드는 타입토큰을 인자로 받는 메서드이다. jackson 라이브러리에는 readValue()라는 메서드를 사용하는데 해당 메서드는 아래와 같이 정의되어 있다. 이렇게 특정 타입의 클래스 정보를 넘겨서 타입 안정성을 가져오는 것을 Type Token이라고 한다.
+
 
 ```java
 public <T> T readValue(String jsonString, Class<T> valueType)
@@ -365,6 +370,32 @@ Constructor<?> constructor = c.getConstructor();
 String s = (String)constructor.newInstance();
 System.out.println(s.getClass().toString());
 ```
+
+**Class 정보를 얻는 방법**     
+
+```java
+
+    // 인스턴스를 통해서 얻기
+    // 인스턴스만 있으면 그 인스턴스가 어떤 클래스의 객체인지 쉽게 알아낼 수 있다.
+    String obj = new String("jirepos");
+    Class<?> c1 = obj.getClass(); // <?> : 어떤 종류의 클래스든 다 얻어올 수 있다
+    
+    
+    // class.forName() 메서드를 통해서 얻기
+    // 인자가 가리키는 문자열이 없을 수 있기 때문에 예외처리가 필요
+    // 클래스 이름을 문자열로 받을 수 있기 때문에 유지보수가 쉽다.
+    Class<?> c2 = Class.forName("java.lang.String"); 
+        
+    // 모든 클래스에 내장된 "class" 스태틱 변수를 통해서 얻기
+    // 클래스 이름을 코드로 명시하기 때문에 유지보수가 어렵다.
+    Class<?> c3 = String.class;
+    
+
+```
+
+
+
+
 
 
 ## 슈퍼타입토큰

@@ -1,4 +1,4 @@
-# Reflection 
+# Java Reflection - Static Inner class
 
 ## 클래스 인스턴스 생성 
 Static inner class를 가진 class를 정의한다. 
